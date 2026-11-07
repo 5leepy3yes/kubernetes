@@ -1,0 +1,27 @@
+controller:
+  serviceType: NodePort
+  nodePort: 32000
+
+agent:
+  enabled: true
+  podTemplates:
+    terraform-agent: |
+      - name: terraform-agent
+        label: terraform
+        containers:
+          - name: jnlp
+            image: jenkins/inbound-agent:latest
+          - name: terraform
+            image: hashicorp/terraform:latest
+            command: "cat"
+            ttyEnabled: true
+    ansible-agent: |
+      - name: ansible-agent
+        label: ansible
+        containers:
+          - name: jnlp
+            image: jenkins/inbound-agent:latest
+          - name: ansible
+            image: cytopia/ansible:latest
+            command: "cat"
+            ttyEnabled: true
