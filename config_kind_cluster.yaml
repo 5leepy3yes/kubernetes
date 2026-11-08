@@ -6,7 +6,15 @@ nodes:
   - role: worker
   - role: worker
     extraPortMappings:
-      - containerPort: 32000
+      - containerPort: 32000 # Jenkins
         hostPort: 8080
         listenAddress: "127.0.0.1"
+        protocol: TCP
+      - containerPort: 32080 # Zabbix Web UI
+        hostPort: 8081
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      - containerPort: 32051 # Zabbix Server/Trapper
+        hostPort: 10051
+        listenAddress: "0.0.0.0" # Allows LAN devices on 192.168.05.0/24 to report in
         protocol: TCP

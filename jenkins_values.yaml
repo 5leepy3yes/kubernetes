@@ -1,7 +1,103 @@
 controller:
   serviceType: NodePort
   nodePort: 32000
+  installPlugins:
+    - kubernetes
+    - workflow-aggregator
+    - git
+    - configuration-as-code
+    - job-dsl
+  JCasC:
+    defaultConfig: true
+    configScripts:
+      zabbix-job: |
+        jobs:
+          - script: |
+              // ==========================================
+              // Job DSL: Automatically creates the Zabbix pipeline on boot
+              // ==========================================
+              pipelineJob('Configure-Zabbix-Network-Discovery') {
+                definition {
+                  cps {
+                    sandbox(true)
+                    script("""
+                      // ==========================================
+                      // Jenkinsfile Pipeline Definition
+                      // ==========================================
+                      pipeline {
+                        agent { label 'ansible' }
+                        stages {
+                          
+                          stage('Create Playbook') {
+                            steps {
+                              container('ansible') {
+                                sh '''
+                                # Write the Ansible configuration file dynamically
+                                cat << 'EOF' > zabbix-config.yml
+                                ---
+                                - name: Configure Zabbix
+                                  hosts: localhost
+                                  collections:
+                                    - community.zabbix
+                                  vars:
+                                    zabbix_url: "http://zabbix-zabbix-web.monitoring.svc.cluster.local:8080"
+                                    zabbix_user: "Admin"
+                                    zabbix_password: "zabbix"
+                                  tasks:
+                                    - name: Create Network Discovery Rule
+                                      zabbix_discovery_rule:
+                                        server_url: "{{ "{{" }} zabbix_url {{ "}}" }}"
+                                        login_user: "{{ "{{" }} zabbix_user {{ "}}" }}"
+                                        login_password: "{{ "{{" }} zabbix_password {{ "}}" }}"
+                                        name: "Home Network Discovery"
+                                        iprange: "192.168.05.0/24"
+                                        delay: "1h"
+                                        dchecks:
+                                          - type: 9
+                                        status: "enabled"
+                                        
+                                    - name: Enable Kubernetes Cluster Monitoring
+                                      zabbix_host:
+                                        server_url: "{{ "{{" }} zabbix_url {{ "}}" }}"
+                                        login_user: "{{ "{{" }} zabbix_user {{ "}}" }}"
+                                        login_password: "{{ "{{" }} zabbix_password {{ "}}" }}"
+                                        host_name: "murmillo-cluster"
+                                        visible_name: "Kind Cluster (murmillo)"
+                                        host_groups:
+                                          - "Templates/Kubernetes"
+                                        link_templates:
+                                          - "Kubernetes cluster state by HTTP"
+                                        status: "enabled"
+                                EOF
+                                '''
+                              }
+                            }
+                          }
+                          
+                          stage('Run Playbook') {
+                            steps {
+                              container('ansible') {
+                                sh '''
+                                # Install dependencies and execute playbook
+                                apk add --no-cache py3-pip
+                                pip3 install zabbix-api --break-system-packages || pip3 install zabbix-api
+                                ansible-galaxy collection install community.zabbix
+                                ansible-playbook zabbix-config.yml
+                                '''
+                              }
+                            }
+                          }
+                          
+                        }
+                      }
+                    """)
+                  }
+                }
+              }
 
+# ==========================================
+# Jenkins Agent Pod Templates (Terraform & Ansible)
+# ==========================================
 agent:
   enabled: true
   podTemplates:
@@ -14,7 +110,7 @@ agent:
           - name: terraform
             image: hashicorp/terraform:latest
             command: "cat"
-            ttyEnabled: true
+            ttyEnabled: true        
     ansible-agent: |
       - name: ansible-agent
         label: ansible
