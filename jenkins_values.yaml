@@ -1,7 +1,16 @@
 controller:
   serviceType: NodePort
   nodePort: 32000
+  installPlugins:
+    - kubernetes
+    - workflow-aggregator
+    - git
+    - configuration-as-code
+    - job-dsl
 
+# ==========================================
+# Jenkins Agent Pod Templates (Terraform & Ansible)
+# ==========================================
 agent:
   enabled: true
   podTemplates:
@@ -14,7 +23,7 @@ agent:
           - name: terraform
             image: hashicorp/terraform:latest
             command: "cat"
-            ttyEnabled: true
+            ttyEnabled: true        
     ansible-agent: |
       - name: ansible-agent
         label: ansible

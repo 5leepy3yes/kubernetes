@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zabbix-pipeline-config
+  namespace: jenkins
+  labels:
+    jenkins-jenkins-config: "true"
+data:
+  zabbix-job.yaml: |
+    jobs:
+      - script: |
+          pipelineJob('Configure-Zabbix-Network-Discovery') {
+            definition {
+              cps {
+                script('''
+                  pipeline {
+                    agent {
+                      label 'ansible'
+                    }
+                    stages {
+                      stage('Create Playbook') {
+                        steps {
+                          container('ansible') {
+                            sh \'\'\'
+                            cat << 'EOF' | sed 's/^ *|//' > zabbix-config.yml
+                            |---
+                            |- name: Configure Zabbix
+                            |  hosts: localhost
+                            |  connection: local
+                            |  gather_facts: false
+                            |  collections:
+                            |    - community.zabbix
+                            |  vars:
+                            |    ansible_network_os: community.zabbix.zabbix
+                            |    ansible_connection: httpapi
+                            |    ansible_host: "zabbix-zabbix-web.monitoring.svc.cluster.local"
+                            |    ansible_httpapi_port: 80
+                            |    ansible_httpapi_use_ssl: false
+                            |    ansible_zabbix_url_path: ""
+                            |    ansible_user: "Admin"
+                            |    ansible_httpapi_pass: "zabbix"
+                            |  tasks:
+                            |    - name: Create Network Discovery Rule
+                            |      zabbix_discovery_rule:
+                            |        name: "Home Network Discovery"
+                            |        iprange: "192.168.50.0/24"
+                            |        delay: "1h"
+                            |        dchecks:
+                            |          - type: "ICMP"
+                            |        status: "enabled"
+                            |    - name: Ensure Kubernetes Host Group Exists
+                            |      zabbix_group:
+                            |        host_groups:
+                            |          - "Templates/Kubernetes"
+                            |        state: present
+                            |    - name: Enable Kubernetes Cluster Monitoring
+                            |      zabbix_host:
+                            |        host_name: "murmillo-cluster"
+                            |        visible_name: "Kind Cluster (murmillo)"
+                            |        host_groups:
+                            |          - "Templates/Kubernetes"
+                            |        link_templates:
+                            |          - "Kubernetes cluster state by HTTP"
+                            |        status: "enabled"
+                            \'\'\'
+                          }
+                        }
+                      }
+                      stage('Execute Playbook') {
+                        steps {
+                          container('ansible') {
+                            sh 'ansible-galaxy collection install community.zabbix'
+                            sh 'ansible-playbook zabbix-config.yml'
+                          }
+                        }
+                      }
+                    }
+                  }
+                '''.stripIndent())
+                sandbox()
+              }
+            }
+          }

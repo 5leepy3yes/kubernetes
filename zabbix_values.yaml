@@ -1,0 +1,11 @@
+zabbixWeb:
+  service:
+    type: NodePort
+    nodePort: 32080
+
+zabbixServer:
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  service:
+    type: NodePort
+    nodePort: 32051
