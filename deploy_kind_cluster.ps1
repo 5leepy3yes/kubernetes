@@ -26,20 +26,23 @@ Write-Host "Creating namespaces..."
 kubectl create namespace jenkins
 kubectl create namespace monitoring
 
+# Apply Job ConfigMaps
+Write-Host "Applying Pipeline ConfigMaps..."
+kubectl apply -f zabbix-job-configmap.yaml
+
 # Deploy Jenkins
 Write-Host "Deploying Jenkins via Helm..."
 # Note: In a real setup, you would point to a custom values.yaml file here
 #helm install jenkins jenkins/jenkins --namespace jenkins --set controller.serviceType=NodePort
-helm install jenkins jenkins/jenkins -n jenkins -f jenkins_values.yaml
+helm upgrade --install jenkins jenkins/jenkins `
+  --namespace jenkins `
+  -f jenkins_values.yaml
 
 # Deploy Zabbix
 Write-Host "Deploying Zabbix via Helm..."
 helm upgrade --install zabbix zabbix/zabbix `
   --namespace monitoring `
-  --set zabbixWeb.service.type=NodePort `
-  --set zabbixWeb.service.nodePort=32080 `
-  --set zabbixServer.service.type=NodePort `
-  --set zabbixServer.service.nodePort=32051
+  -f zabbix_values.yaml
 
 Write-Host "Lab deployment complete!" -ForegroundColor Green
 Write-Host "To get your Jenkins admin password, run:" -ForegroundColor Yellow
